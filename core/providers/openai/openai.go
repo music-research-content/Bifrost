@@ -987,6 +987,11 @@ func HandleOpenAITextCompletionStreaming(
 // It supports both text and image content in messages.
 // Returns a BifrostResponse containing the completion results or an error if the request fails.
 func (provider *OpenAIProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	if isNvidiaUpstream(provider.networkConfig.BaseURL) {
+		cloned := *request
+		sanitizeNvidiaChatRequest(&cloned)
+		request = &cloned
+	}
 	// Check if chat completion is allowed for this provider
 	if err := providerUtils.CheckOperationAllowed(schemas.OpenAI, provider.customProviderConfig, schemas.ChatCompletionRequest); err != nil {
 		return nil, err
@@ -1222,6 +1227,11 @@ func HandleOpenAIChatCompletionRequest(
 // It formats messages, prepares request body, and uses shared streaming logic.
 // Returns a channel for streaming responses and any error that occurred.
 func (provider *OpenAIProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	if isNvidiaUpstream(provider.networkConfig.BaseURL) {
+		cloned := *request
+		sanitizeNvidiaChatRequest(&cloned)
+		request = &cloned
+	}
 	// Check if chat completion stream is allowed for this provider
 	if err := providerUtils.CheckOperationAllowed(schemas.OpenAI, provider.customProviderConfig, schemas.ChatCompletionStreamRequest); err != nil {
 		return nil, err
@@ -1960,6 +1970,11 @@ func HandleOpenAIChatCompletionStreaming(
 
 // Responses performs a responses request to the OpenAI API.
 func (provider *OpenAIProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	if isNvidiaUpstream(provider.networkConfig.BaseURL) {
+		cloned := *request
+		cloned.Input = normalizeNvidiaResponsesInput(request.Input)
+		request = &cloned
+	}
 	if provider.shouldFallbackResponsesToChat(schemas.ResponsesRequest, schemas.ChatCompletionRequest) {
 		chatResponse, err := provider.ChatCompletion(ctx, key, request.ToChatRequest())
 		if err != nil {
@@ -2161,6 +2176,11 @@ func HandleOpenAIResponsesRequest(
 
 // ResponsesStream performs a streaming responses request to the OpenAI API.
 func (provider *OpenAIProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	if isNvidiaUpstream(provider.networkConfig.BaseURL) {
+		cloned := *request
+		cloned.Input = normalizeNvidiaResponsesInput(request.Input)
+		request = &cloned
+	}
 	if provider.shouldFallbackResponsesToChat(schemas.ResponsesStreamRequest, schemas.ChatCompletionStreamRequest) {
 		ctx.SetValue(schemas.BifrostContextKeyIsResponsesToChatCompletionFallback, true)
 		return provider.ChatCompletionStream(ctx, postHookRunner, postHookSpanFinalizer, key, request.ToChatRequest())
