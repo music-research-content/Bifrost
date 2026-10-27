@@ -17,6 +17,7 @@ concurrency:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build-and-release:
@@ -73,7 +74,32 @@ jobs:
             -o ../../dist/bifrost-http-linux-amd64 .
           cd ../..
           (cd dist && sha256sum bifrost-http-linux-amd64 > bifrost-http-linux-amd64.sha256)
+          (cd dist && tar -czf bifrost-http-linux-amd64.tar.gz bifrost-http-linux-amd64)
           ls -lh dist
+
+      - name: Build and push container image
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/bifrost
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          rm -rf .docker-release && mkdir -p .docker-release
+          cp dist/bifrost-http-linux-amd64 .docker-release/main
+          cp transports/docker-entrypoint.sh .docker-release/
+          docker build -f deploy/Dockerfile.release \
+            -t "$IMAGE:${VERSION}" \
+            -t "$IMAGE:latest" \
+            -t "$IMAGE:sha-${GITHUB_SHA::7}" \
+            .docker-release
+          docker push "$IMAGE:${VERSION}"
+          docker push "$IMAGE:latest"
+          docker push "$IMAGE:sha-${GITHUB_SHA::7}"
+          {
+            echo "image=$IMAGE:${VERSION}"
+            echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:${VERSION}")"
+            echo "binary_sha256=$(cut -d' ' -f1 dist/bifrost-http-linux-amd64.sha256)"
+          } > dist/image.txt
+          cat dist/image.txt
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -94,3 +120,8 @@ jobs:
               --title "$VERSION" \
               --generate-notes
           fi
+
+          # The release must always carry the runnable binary, not just the image.
+          gh release view "$VERSION" --json assets --jq '.assets[].name' | tee /tmp/release-assets.txt
+          grep -qx 'bifrost-http-linux-amd64' /tmp/release-assets.txt
+          grep -qx 'bifrost-http-linux-amd64.sha256' /tmp/release-assets.txt

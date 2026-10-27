@@ -1,0 +1,38 @@
+# Runtime image for the prebuilt bifrost-http release binary.
+# The build context must contain:
+#   main                  - the linux/amd64 binary built by CI
+#   docker-entrypoint.sh  - copied from transports/
+ARG BASE_IMAGE=alpine:3.23
+FROM ${BASE_IMAGE}
+
+RUN apk upgrade --no-cache && \
+    apk add --no-cache ca-certificates tzdata libgcc zlib
+
+WORKDIR /app
+
+COPY main /app/main
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+
+ENV APP_PORT=8080 \
+    APP_HOST=0.0.0.0 \
+    LOG_LEVEL=info \
+    LOG_STYLE=json \
+    APP_DIR=/app/data
+
+RUN mkdir -p "$APP_DIR/logs" && \
+    adduser -D -s /bin/sh appuser && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:0 "$APP_DIR" && \
+    chmod -R g=rwX "$APP_DIR" && \
+    chmod +x /app/docker-entrypoint.sh
+
+USER 1000:0
+
+VOLUME ["/app/data"]
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget -q -O /dev/null http://127.0.0.1:${APP_PORT}/health || exit 1
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/main"]
