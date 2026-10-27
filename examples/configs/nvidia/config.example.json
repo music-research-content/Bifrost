@@ -1,0 +1,35 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "config_store": {
+    "enabled": false
+  },
+  "logs_store": {
+    "enabled": false
+  },
+  "providers": {
+    "openai": {
+      "keys": [
+        {
+          "name": "nvidia-account-1",
+          "value": "env.NVIDIA_KEY_1",
+          "models": ["*"],
+          "weight": 1.0,
+          "enabled": true
+        },
+        {
+          "name": "nvidia-account-2",
+          "value": "env.NVIDIA_KEY_2",
+          "models": ["*"],
+          "weight": 1.0,
+          "enabled": true
+        }
+      ],
+      "network_config": {
+        "base_url": "https://integrate.api.nvidia.com",
+        "max_retries": 2,
+        "default_request_timeout_in_seconds": 300,
+        "stream_idle_timeout_in_seconds": 300
+      }
+    }
+  }
+}
